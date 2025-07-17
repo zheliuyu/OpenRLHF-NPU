@@ -22,6 +22,7 @@ from openrlhf.models import Actor
 from openrlhf.models.ring_attn_utils import get_ring_attn_group, set_ring_attn_group
 from openrlhf.utils.distributed_sampler import DistributedSampler
 from openrlhf.utils.distributed_util import torch_dist_barrier_and_cuda_sync
+from openrlhf import ACCELERATOR_TYPE
 from .deepspeed_utils import (
     _z3_params_to_fetch,
     get_eval_ds_config,
@@ -122,8 +123,11 @@ class DeepspeedStrategy(ABC):
         group = ds_device_mesh["sp"].get_group()
         self.ring_attn_rank = dist.get_rank(group=group)
         set_ring_attn_group(group)
-
-        from ring_flash_attn import substitute_hf_flash_attn
+        
+        if ACCELERATOR_TYPE == "GPU":
+            from ring_flash_attn import substitute_hf_flash_attn
+        elif ACCELERATOR_TYPE == "NPU":
+            from ascend_flash_attn import substitute_hf_flash_attn
 
         self.ring_head_stride = getattr(self.args, "ring_head_stride", 1)
         substitute_hf_flash_attn(self.ring_attn_group, self.ring_head_stride)
